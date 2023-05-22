@@ -11,10 +11,6 @@
 
 #define TAMANHO_MAXIMO_MENSAGEM 500
 
-int inicializarEnderecoSocket(const char *protocolo, const char *stringPorta, struct sockaddr_storage *storage)
-{
-}
-
 int criarSocket(char *enderecoIp, char *porta)
 {
     int dominio, tamanhoEndereco, sockfd;
@@ -45,11 +41,11 @@ int criarSocket(char *enderecoIp, char *porta)
         endereco = (struct sockaddr *)&enderecov6;
     }
 
-    sockfd = socket(dominio, SOCK_STREAM, IPPROTO_TCP);
+    sockfd = socket(endereco->sa_family, SOCK_STREAM, 0);
 
-    if (sockfd == 0)
+    if (sockfd == -1)
     {
-        perror("");
+        printf("socket error.");
         exit(1);
     }
 
@@ -137,7 +133,9 @@ int main(int argc, char **argv)
 
     char *comandoExit = "exit", *comandoSelect = "select file", *comandoSend = "send file";
     FILE *arquivo = NULL;
+    char *nomeArquivoRecebido;
     char *nomeArquivo;
+    char conteudoArquivo[TAMANHO_MAXIMO_MENSAGEM];
 
     for (;;)
     {
@@ -148,14 +146,19 @@ int main(int argc, char **argv)
 
         if (strcmp(buffer, comandoExit) == 0)
         {
-            write(sockfd, "exit", sizeof("exit") + 10);
-            // exit(0);
+            write(sockfd, "exit", sizeof("exit"));
+            close(sockfd);
+            printf("connextion closed\n");
+            exit(0);
         }
-        else if (strstr(buffer, comandoSelect) != NULL)
+
+        if (strstr(buffer, comandoSelect) != NULL)
         {
-            nomeArquivo = strrchr(buffer, ' ');
-            nomeArquivo++;
-            arquivo = selecionarArquivo(nomeArquivo);
+            nomeArquivoRecebido = strrchr(buffer, ' ');
+            nomeArquivoRecebido++;
+            strcpy(nomeArquivo, nomeArquivoRecebido);
+            strcpy(conteudoArquivo, "");
+            arquivo = selecionarArquivo(nomeArquivoRecebido);
         }
         else if (strstr(buffer, comandoSend) != NULL)
         {
@@ -165,18 +168,30 @@ int main(int argc, char **argv)
             }
             else
             {
-
-                char conteudoArquivo[TAMANHO_MAXIMO_MENSAGEM];
+                char mensagem[100];
 
                 write(sockfd, nomeArquivo, sizeof(nomeArquivo) + 10);
-                while (fgets(conteudoArquivo, 100, arquivo))
+                while (fgets(mensagem, 100, arquivo))
                 {
+                    strcat(conteudoArquivo, mensagem);
                 }
+
                 write(sockfd, conteudoArquivo, sizeof(conteudoArquivo));
-                fflush(stdin);
+
+                bzero(buffer, sizeof(buffer));
+
+                read(sockfd, buffer, TAMANHO_MAXIMO_MENSAGEM);
+                printf("%s", buffer);
             }
         }
+        else
+        {
+            close(sockfd);
+            exit(0);
+        }
     }
+
+    close(sockfd);
 
     return 1;
 }

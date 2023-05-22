@@ -9,79 +9,108 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-// TODO: validar
 #define TAMANHO_MAXIMO_MENSAGEM 500
 
-int conectar(const char *tipoIp, const char *porta, struct sockaddr **endereco)
+int inicializarEnderecoSocket(const char *tipoIp, const char *stringPorta, struct sockaddr_storage *storage)
 {
-    int dominio, tamanhoEndereco, serverfd;
-    struct sockaddr_in enderecov4;
-    struct sockaddr_in6 enderecov6;
+    uint16_t porta = (uint16_t)atoi(stringPorta);
 
-    enderecov4.sin_family = AF_INET;
-    enderecov4.sin_port = htons(atoi(porta));
-    enderecov4.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (porta == 0)
+        return -1;
 
-    enderecov6.sin6_family = AF_INET6;
-    enderecov6.sin6_port = htons(atoi(porta));
-    enderecov6.sin6_addr = in6addr_any;
+    porta = htons(porta);
+    memset(storage, 0, sizeof(*storage));
 
     if (strcmp(tipoIp, "v4") == 0)
     {
-        dominio = AF_INET;
-        tamanhoEndereco = sizeof(enderecov4);
-        *endereco = (struct sockaddr *)&enderecov4;
-    }
-    else if (strcmp(tipoIp, "v6") == 0)
-    {
-        dominio = AF_INET6;
-        tamanhoEndereco = sizeof(enderecov6);
-        *endereco = (struct sockaddr *)&enderecov6;
+        struct sockaddr_in *addr4 = (struct sockaddr_in *)storage;
+        addr4->sin_family = AF_INET;
+        addr4->sin_port = porta;
+        addr4->sin_addr.s_addr = INADDR_ANY;
+        return 0;
     }
 
-    serverfd = socket(dominio, SOCK_STREAM, IPPROTO_TCP);
-    if (serverfd == 0)
+    if (strcmp(tipoIp, "v6") == 0)
+    {
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)storage;
+        addr6->sin6_family = AF_INET6;
+        addr6->sin6_port = porta;
+        addr6->sin6_addr = in6addr_any;
+        return 0;
+    }
+
+    return -1;
+}
+
+int iniciarSocket(const char *tipoIp, const char *porta)
+{
+    struct sockaddr_storage storage;
+
+    if (inicializarEnderecoSocket(tipoIp, porta, &storage) != 0)
+    {
+        printf("missing arguments.\n");
+        exit(1);
+    }
+
+    int socketServidor = socket(storage.ss_family, SOCK_STREAM, 0);
+    if (socketServidor == -1)
     {
         printf("error creating socket.\n");
         exit(1);
     }
 
-    int enable = 1;
-    if (setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) != 0)
+    int habilitado = 1;
+    if (setsockopt(socketServidor, SOL_SOCKET, SO_REUSEADDR, &habilitado, sizeof(int)) != 0)
     {
-        printf("error setsockopt.\n");
+        printf("error setsockopt\n");
         exit(1);
     }
 
-    if (bind(serverfd, *endereco, tamanhoEndereco) < 0)
+    struct sockaddr *endereco = (struct sockaddr *)(&storage);
+
+    if (bind(socketServidor, endereco, sizeof(storage)) != 0)
     {
-        printf("Could not bind port to socket\n");
+        printf("error bind\n");
         exit(1);
     }
 
-    if (listen(serverfd, 5) < 0)
+    if (listen(socketServidor, 1) != 0)
     {
-        printf("Could not listen on designated address\n");
+        printf("error listen\n");
         exit(1);
     }
 
-    return serverfd;
+    return socketServidor;
 }
 
-int aceitarNovaConexao(int sockfd, struct sockaddr *endereco)
+int conectarComClient(int socketServidor)
 {
-    int connfd;
-    int addrSize = sizeof(endereco);
+    struct sockaddr_storage storage;
+    struct sockaddr *enderecoCliente = (struct sockaddr *)&storage;
+    socklen_t tamanhoEnderecoCliente = sizeof(storage);
+    int socketClient = accept(socketServidor, enderecoCliente, &tamanhoEnderecoCliente);
 
-    if ((connfd = accept(sockfd, (struct sockaddr *)&endereco, &addrSize)) < 0)
+    if (socketClient == -1)
     {
-        printf("Could not accept new connections in this server");
-        exit(EXIT_FAILURE);
+        printf("error accept\n");
+        exit(1);
     }
 
-    printf("connfd: %i", connfd);
+    return socketClient;
+}
 
-    return connfd;
+int verificarSeArquivoExiste(char *nomeArquivo)
+{
+    FILE *arquivo = fopen(nomeArquivo, "rb");
+    return arquivo == NULL ? 0 : 1;
+}
+
+int salvarArquivo(char *caminhoArquivo, char *dados)
+{
+    FILE *arquivo;
+    arquivo = fopen(caminhoArquivo, "wb");
+    fprintf(arquivo, "%s", dados);
+    fclose(arquivo);
 }
 
 int main(int argc, char **argv)
@@ -92,38 +121,51 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    struct sockaddr *endereco;
+    int socketServidor = iniciarSocket(argv[1], argv[2]);
 
-    int sockfd = conectar(argv[1], argv[2], &endereco);
+    int conexao = conectarComClient(socketServidor);
+    char nomeArquivo[TAMANHO_MAXIMO_MENSAGEM];
+    char buffer[TAMANHO_MAXIMO_MENSAGEM];
+    char messagemRetorno[TAMANHO_MAXIMO_MENSAGEM];
 
-    char *nomeArquivo;
-    int conexao = aceitarNovaConexao(sockfd, endereco);
+    for (;;)
+    {
+        char caminhoArquivoServidor[TAMANHO_MAXIMO_MENSAGEM] = "./serverdata/";
 
-    // for (;;)
-    // {
-    //     char buffer[TAMANHO_MAXIMO_MENSAGEM];
+        bzero(nomeArquivo, sizeof(nomeArquivo));
+        bzero(buffer, sizeof(buffer));
+        read(conexao, buffer, sizeof(buffer));
+        strcpy(nomeArquivo, buffer);
 
-    //     fflush(stdin);
-    //     read(conexao, buffer, sizeof(buffer));
+        bzero(buffer, sizeof(buffer));
+        int result = read(conexao, buffer, sizeof(buffer));
 
-    //     printf("%s", buffer);
+        if (result == -1)
+        {
+            char mensagemErro[TAMANHO_MAXIMO_MENSAGEM] = "error receiving file ";
+            strcat(mensagemErro, nomeArquivo);
+            strcat(mensagemErro, "\n");
+            write(conexao, mensagemErro, sizeof(mensagemErro));
+            continue;
+        }
 
-    //     // if (strcmp(buffer, "exit") == 0)
-    //     // {
-    //     //     printf("connection closed\n");
-    //     //     exit(0);
-    //     // }
+        if (buffer[0] == '\0' || (strcmp("exit", buffer) == 0))
+            break;
 
-    //     // strcpy(nomeArquivo, buffer);
+        bzero(messagemRetorno, TAMANHO_MAXIMO_MENSAGEM);
 
-    //     // fflush(stdin);
-    //     // read(conexao, buffer, sizeof(buffer));
+        strcat(caminhoArquivoServidor, nomeArquivo);
+        strcat(messagemRetorno, "file ");
+        strcat(messagemRetorno, nomeArquivo);
+        strcat(messagemRetorno, verificarSeArquivoExiste(caminhoArquivoServidor) == 0 ? " received\n" : " overwritten\n");
 
-    //     // if (buffer[0] == '\0')
-    //     // {
-    //     //     break;
-    //     // }
-    // }
+        salvarArquivo(caminhoArquivoServidor, buffer);
+
+        write(conexao, messagemRetorno, sizeof(messagemRetorno));
+    }
+
+    close(socketServidor);
+    close(conexao);
 
     return 1;
 }
