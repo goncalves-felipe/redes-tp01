@@ -9,10 +9,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-// TODO: validar
 #define TAMANHO_MAXIMO_MENSAGEM 500
 
-int conectar(char *enderecoIp, char *porta)
+int inicializarEnderecoSocket(const char *protocolo, const char *stringPorta, struct sockaddr_storage *storage)
+{
+}
+
+int criarSocket(char *enderecoIp, char *porta)
 {
     int dominio, tamanhoEndereco, sockfd;
 
@@ -47,7 +50,7 @@ int conectar(char *enderecoIp, char *porta)
     if (sockfd == 0)
     {
         perror("");
-        exit(EXIT_FAILURE);
+        exit(1);
     }
 
     int conexao = connect(sockfd, endereco, tamanhoEndereco);
@@ -55,7 +58,7 @@ int conectar(char *enderecoIp, char *porta)
     if (conexao == -1)
     {
         printf("connection refused.");
-        exit(EXIT_FAILURE);
+        exit(1);
     }
 
     return sockfd;
@@ -94,20 +97,20 @@ int validarExtensaoArquivo(char *nomeArquivo)
     return 1;
 }
 
-void selecionarArquivo(char *nomeArquivo)
+FILE *selecionarArquivo(char *nomeArquivo)
 {
     int formatoValido = validarFormatoArquivo(nomeArquivo);
 
     if (formatoValido == 0)
     {
-        return;
+        return NULL;
     }
 
     int extensaoValida = validarExtensaoArquivo(nomeArquivo);
 
     if (extensaoValida == 0)
     {
-        return;
+        return NULL;
     }
 
     FILE *arquivo = fopen(nomeArquivo, "r");
@@ -115,23 +118,26 @@ void selecionarArquivo(char *nomeArquivo)
     if (arquivo == NULL)
     {
         printf("%s do not exist\n", nomeArquivo);
+        return NULL;
     }
-}
 
-int enviarArquivo() { return 0; }
+    printf("%s selected\n", nomeArquivo);
+    return arquivo;
+}
 
 int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        printf("missing arguments.");
-        exit(EXIT_FAILURE);
+        printf("missing arguments.\n");
+        exit(1);
     }
 
-    // int sockfd = conectar(argv[1], argv[2]);
+    int sockfd = criarSocket(argv[1], argv[2]);
 
     char *comandoExit = "exit", *comandoSelect = "select file", *comandoSend = "send file";
-    FILE *arquivo;
+    FILE *arquivo = NULL;
+    char *nomeArquivo;
 
     for (;;)
     {
@@ -142,19 +148,33 @@ int main(int argc, char **argv)
 
         if (strcmp(buffer, comandoExit) == 0)
         {
-            exit(1);
+            write(sockfd, "exit", sizeof("exit") + 10);
+            // exit(0);
         }
-
-        if (strstr(buffer, comandoSelect) != NULL)
+        else if (strstr(buffer, comandoSelect) != NULL)
         {
-            char *nomeArquivo = strrchr(buffer, ' ');
+            nomeArquivo = strrchr(buffer, ' ');
             nomeArquivo++;
-            selecionarArquivo(nomeArquivo);
+            arquivo = selecionarArquivo(nomeArquivo);
         }
-
-        if (strcmp(buffer, comandoSend) == 0)
+        else if (strstr(buffer, comandoSend) != NULL)
         {
-            enviarArquivo();
+            if (arquivo == NULL)
+            {
+                printf("no file selected\n");
+            }
+            else
+            {
+
+                char conteudoArquivo[TAMANHO_MAXIMO_MENSAGEM];
+
+                write(sockfd, nomeArquivo, sizeof(nomeArquivo) + 10);
+                while (fgets(conteudoArquivo, 100, arquivo))
+                {
+                }
+                write(sockfd, conteudoArquivo, sizeof(conteudoArquivo));
+                fflush(stdin);
+            }
         }
     }
 
