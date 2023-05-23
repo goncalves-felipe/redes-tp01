@@ -23,19 +23,19 @@ int inicializarEnderecoSocket(const char *tipoIp, const char *stringPorta, struc
 
     if (strcmp(tipoIp, "v4") == 0)
     {
-        struct sockaddr_in *addr4 = (struct sockaddr_in *)storage;
-        addr4->sin_family = AF_INET;
-        addr4->sin_port = porta;
-        addr4->sin_addr.s_addr = INADDR_ANY;
+        struct sockaddr_in *enderecov4 = (struct sockaddr_in *)storage;
+        enderecov4->sin_family = AF_INET;
+        enderecov4->sin_port = porta;
+        enderecov4->sin_addr.s_addr = INADDR_ANY;
         return 0;
     }
 
     if (strcmp(tipoIp, "v6") == 0)
     {
-        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)storage;
-        addr6->sin6_family = AF_INET6;
-        addr6->sin6_port = porta;
-        addr6->sin6_addr = in6addr_any;
+        struct sockaddr_in6 *enderecov6 = (struct sockaddr_in6 *)storage;
+        enderecov6->sin6_family = AF_INET6;
+        enderecov6->sin6_port = porta;
+        enderecov6->sin6_addr = in6addr_any;
         return 0;
     }
 
