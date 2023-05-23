@@ -99,13 +99,14 @@ int conectarComClient(int socketServidor)
     return socketClient;
 }
 
-int verificarSeArquivoExiste(char *nomeArquivo)
+int verificarSeArquivoExiste(char *caminhoArquivo)
 {
-    FILE *arquivo = fopen(nomeArquivo, "rb");
+    FILE *arquivo = fopen(caminhoArquivo, "rb");
+    fclose(arquivo);
     return arquivo == NULL ? 0 : 1;
 }
 
-int salvarArquivo(char *caminhoArquivo, char *dados)
+void salvarArquivo(char *caminhoArquivo, char *dados)
 {
     FILE *arquivo;
     arquivo = fopen(caminhoArquivo, "wb");
