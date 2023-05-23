@@ -132,12 +132,9 @@ int main(int argc, char **argv)
     {
         char caminhoArquivoServidor[TAMANHO_MAXIMO_MENSAGEM] = "./serverdata/";
 
-        bzero(nomeArquivo, sizeof(nomeArquivo));
-        bzero(buffer, sizeof(buffer));
         read(conexao, buffer, sizeof(buffer));
         strcpy(nomeArquivo, buffer);
 
-        bzero(buffer, sizeof(buffer));
         int result = read(conexao, buffer, sizeof(buffer));
 
         if (result == -1)
@@ -152,10 +149,8 @@ int main(int argc, char **argv)
         if (buffer[0] == '\0' || (strcmp("exit", buffer) == 0))
             break;
 
-        bzero(messagemRetorno, TAMANHO_MAXIMO_MENSAGEM);
-
         strcat(caminhoArquivoServidor, nomeArquivo);
-        strcat(messagemRetorno, "file ");
+        strcpy(messagemRetorno, "file ");
         strcat(messagemRetorno, nomeArquivo);
         strcat(messagemRetorno, verificarSeArquivoExiste(caminhoArquivoServidor) == 0 ? " received\n" : " overwritten\n");
 

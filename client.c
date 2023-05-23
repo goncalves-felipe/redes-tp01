@@ -178,8 +178,6 @@ int main(int argc, char **argv)
 
                 write(sockfd, conteudoArquivo, sizeof(conteudoArquivo));
 
-                bzero(buffer, sizeof(buffer));
-
                 read(sockfd, buffer, TAMANHO_MAXIMO_MENSAGEM);
                 printf("%s", buffer);
             }
