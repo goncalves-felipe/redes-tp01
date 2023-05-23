@@ -27,7 +27,7 @@ int inicializarEnderecoSocket(const char *tipoIp, const char *stringPorta, struc
         enderecov4->sin_family = AF_INET;
         enderecov4->sin_port = porta;
         enderecov4->sin_addr.s_addr = INADDR_ANY;
-        return 0;
+        return 1;
     }
 
     if (strcmp(tipoIp, "v6") == 0)
@@ -36,17 +36,17 @@ int inicializarEnderecoSocket(const char *tipoIp, const char *stringPorta, struc
         enderecov6->sin6_family = AF_INET6;
         enderecov6->sin6_port = porta;
         enderecov6->sin6_addr = in6addr_any;
-        return 0;
+        return 1;
     }
 
-    return -1;
+    return 0;
 }
 
 int iniciarSocket(const char *tipoIp, const char *porta)
 {
     struct sockaddr_storage storage;
 
-    if (inicializarEnderecoSocket(tipoIp, porta, &storage) != 0)
+    if (inicializarEnderecoSocket(tipoIp, porta, &storage) == 0)
     {
         printf("missing arguments.\n");
         exit(1);
